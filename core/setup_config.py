@@ -244,11 +244,37 @@ def main():
     # 3. Model Mapping Wizard
     print_header("Interactive Model Mapping Wizard")
     
-    coder_model = select_model("coder", models_list, "qwen2.5-coder:3b")
+    # Discover optimal default recommendations dynamically from installed Ollama models
+    def discover_default(role, model_list, fallback):
+        # 1. Prioritize existing user-configured mapping
+        existing_mapped = config.get("models", {}).get(role)
+        if existing_mapped:
+            return existing_mapped
+            
+        # 2. Match logically against installed local models
+        for tag in model_list:
+            tag_lower = tag.lower()
+            if role == "coder" and ("coder" in tag_lower or "qwen" in tag_lower or "deepseek" in tag_lower):
+                return tag
+            elif role in ("thinker", "security") and ("llama" in tag_lower or "mistral" in tag_lower or "phi" in tag_lower or "gemma" in tag_lower):
+                return tag
+                
+        # 3. Fallback to the first installed local model if any exist
+        if model_list:
+            return model_list[0]
+            
+        # 4. Ultimate generic string fallback
+        return fallback
+
+    default_coder = discover_default("coder", models_list, "qwen2.5-coder")
+    default_thinker = discover_default("thinker", models_list, "llama3.2")
+    default_security = discover_default("security", models_list, "llama3.2")
+
+    coder_model = select_model("coder", models_list, default_coder)
     print()
-    thinker_model = select_model("thinker", models_list, "llama3.2:3b")
+    thinker_model = select_model("thinker", models_list, default_thinker)
     print()
-    security_model = select_model("security", models_list, "llama3.2:3b")
+    security_model = select_model("security", models_list, default_security)
 
     config["models"]["coder"] = coder_model
     config["models"]["thinker"] = thinker_model

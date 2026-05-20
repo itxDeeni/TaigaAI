@@ -31,6 +31,12 @@ def run_cmd(args):
     except subprocess.CalledProcessError:
         return ""
 
+def truncate_diff(diff_content, max_chars=4000):
+    """Truncates massive diffs to prevent CPU processing overhead on local Ollama setups."""
+    if len(diff_content) > max_chars:
+        return diff_content[:max_chars] + f"\n\n[... Diff truncated to save memory & processing time ({len(diff_content) - max_chars} characters omitted) ...]\n"
+    return diff_content
+
 def main():
     # 1. Security Check: Enforce workspace CWD bounds
     validate_cwd()
@@ -68,7 +74,7 @@ Guidelines:
 
         # Build Normalized Context
         builder = ContextBuilder()
-        builder.add_git_diff(staged_diff, diff_type="cached")
+        builder.add_git_diff(truncate_diff(staged_diff), diff_type="cached")
         prompt = builder.build()
 
         model = models.get("coder", "qwen2.5-coder")
@@ -108,7 +114,7 @@ Keep it direct, professional, and focus exclusively on the actual changes presen
 
         # Build Normalized Context
         builder = ContextBuilder()
-        builder.add_git_diff(branch_diff, diff_type=diff_type)
+        builder.add_git_diff(truncate_diff(branch_diff), diff_type=diff_type)
         prompt = builder.build()
 
         model = models.get("thinker", "llama3.2")

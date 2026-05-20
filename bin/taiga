@@ -39,11 +39,11 @@ def main():
     mode_group = parser.add_mutually_exclusive_group()
     mode_group.add_argument(
         "-c", "--coder", action="store_true",
-        help="Use local Qwen-Coder model (default)"
+        help="Use local Coder model (default)"
     )
     mode_group.add_argument(
         "-t", "--thinker", action="store_true",
-        help="Use local Llama thinker model"
+        help="Use local thinker model"
     )
     mode_group.add_argument(
         "-s", "--sec", action="store_true",

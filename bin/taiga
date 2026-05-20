@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+import os
+import sys
+import argparse
+from pathlib import Path
+
+# Add project root directory to path for robust core module resolution
+PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from core.security import validate_path, validate_cwd, load_config
+from core.context_builder import ContextBuilder
+from core.ollama_client import OllamaClient
+
+# Premium ANSI colors for terminal UI
+COLOR_RESET = "\033[0m"
+COLOR_BOLD = "\033[1m"
+COLOR_TEAL = "\033[38;5;38m"
+COLOR_RED = "\033[38;5;196m"
+
+def print_err(text):
+    print(f"{COLOR_RED}{COLOR_BOLD}taiga: {text}{COLOR_RESET}", file=sys.stderr)
+
+def main():
+    # 1. Enforce safety sandbox boundary on execution folder
+    validate_cwd()
+    
+    # 2. Load workstation configurations
+    config = load_config()
+    models = config.get("models", {})
+    ollama_url = config.get("ollama_url", "http://localhost:11434")
+    
+    parser = argparse.ArgumentParser(
+        description="Secure daily driver local AI tool wrapping Ollama."
+    )
+    
+    # Mode configurations
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
+        "-c", "--coder", action="store_true",
+        help="Use local Qwen-Coder model (default)"
+    )
+    mode_group.add_argument(
+        "-t", "--thinker", action="store_true",
+        help="Use local Llama thinker model"
+    )
+    mode_group.add_argument(
+        "-s", "--sec", action="store_true",
+        help="Use security analysis model"
+    )
+    
+    # Execution options
+    parser.add_argument(
+        "--system", type=str, default=None,
+        help="Custom system prompt override"
+    )
+    parser.add_argument(
+        "-p", "--prompt", type=str, default="",
+        help="Direct instruction prompt"
+    )
+    parser.add_argument(
+        "--max-tokens", type=int, default=None,
+        help="Limit output tokens"
+    )
+    parser.add_argument(
+        "--timeout", type=int, default=120,
+        help="Custom query timeout (default: 120s)"
+    )
+    parser.add_argument(
+        "--tool", type=str, default=None,
+        help="Specific tool name contract validation (e.g. taiga-review, taiga-sec)"
+    )
+    parser.add_argument(
+        "files", nargs="*",
+        help="Optional local text files to append as context"
+    )
+    
+    args = parser.parse_args()
+    
+    # Select model mapping
+    if args.thinker:
+        model = models.get("thinker", "llama3.2:3b")
+        mode_name = "Thinker Mode"
+    elif args.sec:
+        model = models.get("security", "llama3.2:3b")
+        mode_name = "Security Mode"
+    else:
+        model = models.get("coder", "qwen2.5-coder:3b")
+        mode_name = "Coder Mode"
+        
+    # 3. Context Normalization Layer
+    builder = ContextBuilder()
+    
+    # Normalize input files with absolute sandboxing validation
+    for fpath in args.files:
+        resolved_file = validate_path(fpath)
+        try:
+            with open(resolved_file, "r") as f:
+                content = f.read()
+            builder.add_file(str(resolved_file), content)
+        except Exception as e:
+            print_err(f"Failed to read file '{fpath}': {e}")
+            sys.exit(1)
+            
+    # Normalize piped stdin stream
+    if not sys.stdin.isatty():
+        builder.add_stdin(sys.stdin.read())
+        
+    # Build context structures
+    full_prompt = builder.build(user_instruction=args.prompt)
+    
+    # Verify we actually have inputs
+    if not args.prompt and not args.files and sys.stdin.isatty():
+        parser.print_help()
+        sys.exit(0)
+        
+    # Output UI header to stderr (keeps stdout pipeable)
+    banner = f"[{mode_name} | {model}]"
+    print(f"{COLOR_TEAL}{COLOR_BOLD}{banner}{COLOR_RESET}", file=sys.stderr)
+    
+    # 4. Invoke secure query
+    client = OllamaClient(base_url=ollama_url)
+    success = client.query(
+        model=model,
+        prompt=full_prompt,
+        system_prompt=args.system,
+        max_tokens=args.max_tokens,
+        timeout=args.timeout,
+        tool_name=args.tool
+    )
+    
+    if not success:
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

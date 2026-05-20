@@ -1,0 +1,13 @@
+{
+  "allowed_paths": [
+    "~/Documents/Code",
+    "~/projects",
+    "~/dev"
+  ],
+  "models": {
+    "coder": "qwen2.5-coder",
+    "thinker": "llama3.2",
+    "security": "llama3.2"
+  },
+  "ollama_url": "http://localhost:11434"
+}

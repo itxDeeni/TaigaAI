@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+# Add project root directory to path for robust core module resolution
+PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from core.security import validate_path, validate_cwd, load_config
+from core.context_builder import ContextBuilder
+from core.ollama_client import OllamaClient
+
+# Premium Terminal Colors
+COLOR_RESET = "\033[0m"
+COLOR_BOLD = "\033[1m"
+COLOR_TEAL = "\033[38;5;38m"
+COLOR_RED = "\033[38;5;196m"
+
+def main():
+    # 1. Security Check: Enforce workspace CWD bounds
+    validate_cwd()
+
+    # 2. Verify Inputs
+    # If no files are passed and stdin is a terminal, print usage help
+    if len(sys.argv) < 2 and sys.stdin.isatty():
+        print(f"{COLOR_TEAL}{COLOR_BOLD}taiga-sec: Secure Local Security Analyst{COLOR_RESET}")
+        print("Usage:")
+        print("  taiga-sec <file_path>       Analyze a log, JSON payload, or config file")
+        print("  cat <log> | taiga-sec       Audit logs or payload streamed from stdin")
+        sys.exit(0)
+
+    # 3. Load configurations
+    config = load_config()
+    models = config.get("models", {})
+    ollama_url = config.get("ollama_url", "http://localhost:11434")
+    model = models.get("security", "llama3.2:3b")
+
+    # 4. Normalize contexts
+    builder = ContextBuilder()
+
+    # Gather positional file inputs with full absolute Path.resolve() validation
+    for fpath in sys.argv[1:]:
+        resolved = validate_path(fpath)
+        try:
+            with open(resolved, "r") as f:
+                content = f.read()
+            builder.add_file(str(resolved), content)
+        except Exception as e:
+            print(f"{COLOR_RED}Failed to read file '{fpath}': {e}{COLOR_RESET}", file=sys.stderr)
+            sys.exit(1)
+
+    # Gather piped stdin input
+    if not sys.stdin.isatty():
+        builder.add_stdin(sys.stdin.read())
+
+    prompt = builder.build()
+
+    system_prompt = """You are TAIGA-SEC, a security-hardened local logical vulnerability analyst. Your review is strictly read-only.
+You examine logs, raw JSON configurations, JWT/OAuth structures, API request/response dumps, and server payloads to detect:
+1. Insecure Direct Object References (IDOR) - such as predictable client-controlled IDs (e.g., '/api/users/1004/invoice') without corresponding authorization checks.
+2. Authentication or Authorization bypasses - such as lack of session validation, token signature checks, or accessible admin actions.
+3. Secrets Exposure - such as database credentials, cleartext tokens, API keys, or private key leaks.
+
+You MUST conform strictly to the following structured layout. Do not write introductory text, chat greetings, or concluding remarks. Print only the finding blocks. If no vulnerabilities are identified, return a single block indicating 'Severity: Low' and 'Vulnerability: No logical flaws or credentials exposure detected'.
+
+[AI-TOOL: taiga-sec]
+Severity: [Low/Medium/High/Critical]
+Vulnerability: <IDOR / Broken Auth / Secrets Leak / PII Leak>
+Location: <Endpoint URI, file name, line number, or JSON key>
+Evidence: <Log or payload snippet exposing the risk>
+Remediation: <Specific secure design advice and fix implementation description>"""
+
+    # 5. Invoke unified query
+    print(f"{COLOR_TEAL}{COLOR_BOLD}[Security logical threat reviewer | {model}]{COLOR_RESET}", file=sys.stderr)
+    client = OllamaClient(base_url=ollama_url)
+    success = client.query(
+        model=model,
+        prompt=prompt,
+        system_prompt=system_prompt,
+        tool_name="taiga-sec"
+    )
+
+    if not success:
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

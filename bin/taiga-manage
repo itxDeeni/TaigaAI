@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+import os
+import sys
+import json
+import sqlite3
+import platform
+from pathlib import Path
+
+# Add project root directory to path for robust core module resolution
+PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from core.security import load_config, get_config_path
+from core.setup_config import fetch_local_models, main as run_setup_wizard
+
+# Premium terminal styling colors
+COLOR_RESET = "\033[0m"
+COLOR_BOLD = "\033[1m"
+COLOR_TEAL = "\033[38;5;38m"
+COLOR_GREEN = "\033[38;5;40m"
+COLOR_AMBER = "\033[38;5;214m"
+COLOR_RED = "\033[38;5;196m"
+COLOR_GRAY = "\033[38;5;244m"
+
+def print_banner(text):
+    print(f"\n{COLOR_TEAL}{COLOR_BOLD}{'=' * 50}")
+    print(f" {text.center(48)}")
+    print(f"{'=' * 50}{COLOR_RESET}\n")
+
+def run_health_diagnostics():
+    print_banner("TAIGAAI SYSTEM DIAGNOSTICS")
+    
+    # 1. Platform Info
+    print(f"{COLOR_BOLD}Workstation OS:{COLOR_RESET} {platform.system()} {platform.release()} ({platform.machine()})")
+    
+    # 2. Config File Status
+    cfg_path = get_config_path()
+    print(f"{COLOR_BOLD}Configuration Path:{COLOR_RESET} {cfg_path}")
+    if cfg_path.exists():
+        print(f"  Status: {COLOR_GREEN}Found{COLOR_RESET}")
+        try:
+            config = load_config()
+            print(f"  Allowed Sandbox Paths: {', '.join(config.get('allowed_paths', []))}")
+            models = config.get("models", {})
+            print(f"  Active Model Mappings:")
+            print(f"    - Coder: {COLOR_TEAL}{models.get('coder', 'None')}{COLOR_RESET}")
+            print(f"    - Thinker: {COLOR_TEAL}{models.get('thinker', 'None')}{COLOR_RESET}")
+            print(f"    - Security: {COLOR_TEAL}{models.get('security', 'None')}{COLOR_RESET}")
+        except Exception as e:
+            print(f"  {COLOR_RED}Failed to parse config: {e}{COLOR_RESET}")
+    else:
+        print(f"  Status: {COLOR_AMBER}Missing (Default routing active){COLOR_RESET}")
+
+    # 3. Ollama server connection
+    config = load_config()
+    ollama_url = config.get("ollama_url", "http://localhost:11434")
+    print(f"\n{COLOR_BOLD}Ollama URL Connection:{COLOR_RESET} {ollama_url}")
+    models_list, online = fetch_local_models(ollama_url)
+    if online:
+        print(f"  Status: {COLOR_GREEN}Online (Connected){COLOR_RESET}")
+        print(f"  Available Local Models: {', '.join(models_list) if models_list else 'None downloaded'}")
+    else:
+        print(f"  Status: {COLOR_RED}Offline (Server not responding at {ollama_url}){COLOR_RESET}")
+
+    # 4. Prompt Cache Stats
+    # Try finding the database location
+    db_name = "taiga_cache.db"
+    db_path = Path("~/.config/taiga-ai").expanduser() / db_name
+    if not db_path.exists():
+        db_path = Path(__file__).resolve().parent.parent / db_name
+        
+    print(f"\n{COLOR_BOLD}SQLite Query Cache Database:{COLOR_RESET} {db_path}")
+    if db_path.exists():
+        print(f"  Status: {COLOR_GREEN}Active{COLOR_RESET}")
+        try:
+            with sqlite3.connect(db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM prompt_cache")
+                count = cursor.fetchone()[0]
+                print(f"  Total Cached Prompt Sequences: {COLOR_TEAL}{count} / 200 records{COLOR_RESET}")
+        except Exception as e:
+            print(f"  {COLOR_RED}Could not read query cache database: {e}{COLOR_RESET}")
+    else:
+        print(f"  Status: {COLOR_GRAY}Uninitialized (Cache is created during first AI query){COLOR_RESET}")
+    
+    input(f"\n{COLOR_GRAY}Press Enter to return to main menu...{COLOR_RESET}")
+
+def view_documentation():
+    print_banner("TAIGAAI DOCUMENTATION READER")
+    print("Which documentation file would you like to read?")
+    print("1) README.md (Standard CLI usage & options)")
+    print("2) SECURITY.md (Sandbox security model & policies)")
+    print("3) Return to main menu")
+    
+    choice = input("\nSelect choice [1-3]: ").strip()
+    if choice not in ("1", "2"):
+        return
+        
+    filename = "README.md" if choice == "1" else "SECURITY.md"
+    doc_path = Path(__file__).resolve().parent.parent / filename
+    
+    if not doc_path.exists():
+        print(f"{COLOR_RED}Documentation file '{filename}' was not found in: {doc_path}{COLOR_RESET}")
+        input(f"\n{COLOR_GRAY}Press Enter to continue...{COLOR_RESET}")
+        return
+
+    print_banner(f"READING: {filename}")
+    try:
+        with open(doc_path, "r") as f:
+            lines = f.readlines()
+        
+        # Display with simple line pager
+        page_size = 35
+        for i in range(0, len(lines), page_size):
+            chunk = lines[i:i+page_size]
+            print("".join(chunk))
+            if i + page_size < len(lines):
+                cont = input(f"\n{COLOR_TEAL}--- Press Enter for next page, or 'q' to stop ---{COLOR_RESET} ").strip().lower()
+                if cont == "q":
+                    break
+    except Exception as e:
+        print(f"{COLOR_RED}Failed to read documentation: {e}{COLOR_RESET}")
+        
+    input(f"\n{COLOR_GRAY}Reading completed. Press Enter to return to main menu...{COLOR_RESET}")
+
+def perform_uninstallation():
+    print_banner("TAIGAAI SYSTEM-WIDE UNINSTALLATION")
+    print(f"{COLOR_RED}{COLOR_BOLD}⚠️ WARNING: This will delete all global command shortcuts for TaigaAI.{COLOR_RESET}")
+    print("This cleans all symlinks and restores system shell environment states.")
+    choice = input("Are you absolutely sure you want to proceed? (y/N): ").strip().lower()
+    if choice != "y":
+        print("Uninstallation cancelled.")
+        return
+
+    print("\nStarting uninstallation process...")
+    local_bin_dir = Path("~/.local/bin").expanduser()
+    
+    commands = ["taiga", "taiga-git", "taiga-review", "taiga-sec", "taiga-manage"]
+    removed_count = 0
+    
+    # 1. Clean Linux/macOS symlinks
+    if local_bin_dir.exists():
+        for cmd in commands:
+            sym_path = local_bin_dir / cmd
+            if sym_path.exists() or sym_path.is_symlink():
+                try:
+                    sym_path.unlink()
+                    print(f"✔ Removed symlink: {sym_path}")
+                    removed_count += 1
+                except Exception as e:
+                    print(f"{COLOR_RED}Failed to remove {sym_path}: {e}{COLOR_RESET}")
+
+    # 2. Inform user how to proceed
+    print(f"\n{COLOR_GREEN}✔ Uninstallation of CLI command shortcuts completed successfully! ({removed_count} links removed).{COLOR_RESET}")
+    print(f"{COLOR_GRAY}Note: The source directory resides intact. You can safely delete the '{PROJECT_ROOT}' folder manually if you want to completely remove the code.{COLOR_RESET}")
+    sys.exit(0)
+
+def main():
+    while True:
+        os.system("clear" if os.name != "nt" else "cls")
+        print_banner("TAIGAAI MANAGEMENT CONSOLE")
+        
+        print("1) Run Setup & Diagnostics Wizard (Update Mappings)")
+        print("2) System Health Diagnostics (Audit connections & Cache)")
+        print("3) Display Core Documentation (README & Security Policies)")
+        print("4) System-wide Uninstallation (Clean all CLI links)")
+        print("5) Exit")
+        
+        try:
+            choice = input(f"\n{COLOR_BOLD}Select option [1-5]: {COLOR_RESET}").strip()
+        except (KeyboardInterrupt, EOFError):
+            print("\nExiting management console.")
+            sys.exit(0)
+            
+        if choice == "1":
+            os.system("clear" if os.name != "nt" else "cls")
+            run_setup_wizard()
+            input(f"\n{COLOR_GRAY}Press Enter to return to main menu...{COLOR_RESET}")
+        elif choice == "2":
+            os.system("clear" if os.name != "nt" else "cls")
+            run_health_diagnostics()
+        elif choice == "3":
+            os.system("clear" if os.name != "nt" else "cls")
+            view_documentation()
+        elif choice == "4":
+            os.system("clear" if os.name != "nt" else "cls")
+            perform_uninstallation()
+        elif choice == "5":
+            print("Exiting management console.")
+            sys.exit(0)
+
+if __name__ == "__main__":
+    main()

@@ -64,8 +64,8 @@ def main():
         help="Limit output tokens"
     )
     parser.add_argument(
-        "--timeout", type=int, default=120,
-        help="Custom query timeout (default: 120s)"
+        "--timeout", type=int, default=300,
+        help="Custom query timeout (default: 300s)"
     )
     parser.add_argument(
         "--tool", type=str, default=None,

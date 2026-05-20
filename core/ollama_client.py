@@ -22,7 +22,7 @@ COLOR_AMBER = "\033[38;5;214m"
 COLOR_GRAY = "\033[38;5;244m"
 
 class OllamaClient:
-    def __init__(self, base_url="http://localhost:11434", default_timeout=120):
+    def __init__(self, base_url="http://localhost:11434", default_timeout=300):
         self.base_url = base_url.rstrip("/")
         self.default_timeout = default_timeout
         self.cache = LocalAICache()

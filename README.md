@@ -198,20 +198,20 @@ You can completely replace GitHub Copilot or tab-completion with local models ru
 {
   "models": [
     {
-      "title": "Qwen 2.5 Coder 3B",
+      "title": "Qwen 2.5 Coder",
       "provider": "ollama",
-      "model": "qwen2.5-coder:3b"
+      "model": "qwen2.5-coder"
     },
     {
-      "title": "Llama 3.2 3B",
+      "title": "Llama 3.2",
       "provider": "ollama",
-      "model": "llama3.2:3b"
+      "model": "llama3.2"
     }
   ],
   "tabAutocompleteModel": {
-    "title": "Qwen 2.5 Coder 3B",
+    "title": "Qwen 2.5 Coder",
     "provider": "ollama",
-    "model": "qwen2.5-coder:3b"
+    "model": "qwen2.5-coder"
   },
   "tabAutocompleteOptions": {
     "useCopyBuffer": true,
@@ -224,7 +224,7 @@ You can completely replace GitHub Copilot or tab-completion with local models ru
 If you only want fast, single-line inline code completions:
 1. Install **Llama Coder** from the VS Code Extensions tab.
 2. Open VS Code Settings (`Ctrl+,`) and configure:
-   - `Llama Coder: Model` ➔ `qwen2.5-coder:3b`
+   - `Llama Coder: Model` ➔ `qwen2.5-coder`
    - `Llama Coder: Endpoint` ➔ `http://localhost:11434`
 
 ---

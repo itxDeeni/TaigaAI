@@ -34,7 +34,7 @@ def main():
     config = load_config()
     models = config.get("models", {})
     ollama_url = config.get("ollama_url", "http://localhost:11434")
-    model = models.get("coder", "qwen2.5-coder:3b")
+    model = models.get("coder", "qwen2.5-coder")
 
     # 4. Normalize contexts
     builder = ContextBuilder()

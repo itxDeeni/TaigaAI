@@ -8,6 +8,7 @@ __pycache__/
 .cache/
 taiga_cache.db
 config.json
+MARKETING.md
 
 # Environments
 .venv/

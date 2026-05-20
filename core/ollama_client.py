@@ -27,6 +27,16 @@ class OllamaClient:
         self.default_timeout = default_timeout
         self.cache = LocalAICache()
 
+    def _get_local_tags(self):
+        """Fetches list of downloaded model tags from the local Ollama server."""
+        try:
+            req = urllib.request.Request(f"{self.base_url}/api/tags", method="GET")
+            with urllib.request.urlopen(req, timeout=2) as response:
+                data = json.loads(response.read().decode("utf-8"))
+                return [m["name"] for m in data.get("models", [])]
+        except Exception:
+            return []
+
     def query(self, model, prompt, system_prompt=None, max_tokens=None, timeout=None, tool_name=None):
         """
         Main query router with integrated Caching, Fallback chains, and Output validation.
@@ -42,13 +52,33 @@ class OllamaClient:
             print()
             return True
 
-        # 2. Query execution with fallback model options
-        # Fallback chain: Primary Model -> Llama3.2:3b -> Qwen2.5-Coder:3b
+        # 2. Query execution with dynamic fallback model options
+        local_tags = self._get_local_tags()
+        
+        # Find matches among installed tags to avoid pulling specific versions
+        def find_local_match(pattern):
+            for tag in local_tags:
+                if pattern in tag:
+                    return tag
+            return None
+
+        # Build dynamic, model-agnostic fallback chain
         model_chain = [model]
-        if "llama3.2" not in model:
-            model_chain.append("llama3.2:3b")
-        if "qwen2.5-coder" not in model:
-            model_chain.append("qwen2.5-coder:3b")
+        
+        # 1. Prioritize other active model mappings from user configuration
+        try:
+            from core.security import load_config
+            config = load_config()
+            for role_model in config.get("models", {}).values():
+                if role_model and role_model not in model_chain:
+                    model_chain.append(role_model)
+        except Exception:
+            pass
+
+        # 2. Append other locally installed models to avoid pulling missing models
+        for tag in local_tags:
+            if tag not in model_chain:
+                model_chain.append(tag)
 
         response_content = None
         used_model = None

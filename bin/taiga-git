@@ -71,7 +71,7 @@ Guidelines:
         builder.add_git_diff(staged_diff, diff_type="cached")
         prompt = builder.build()
 
-        model = models.get("coder", "qwen2.5-coder:3b")
+        model = models.get("coder", "qwen2.5-coder")
         print(f"{COLOR_TEAL}{COLOR_BOLD}[Git Commit Assistant | {model}]{COLOR_RESET}", file=sys.stderr)
 
         client = OllamaClient(base_url=ollama_url)
@@ -111,7 +111,7 @@ Keep it direct, professional, and focus exclusively on the actual changes presen
         builder.add_git_diff(branch_diff, diff_type=diff_type)
         prompt = builder.build()
 
-        model = models.get("thinker", "llama3.2:3b")
+        model = models.get("thinker", "llama3.2")
         print(f"{COLOR_TEAL}{COLOR_BOLD}[Git PR Summarizer | {model}]{COLOR_RESET}", file=sys.stderr)
 
         client = OllamaClient(base_url=ollama_url)

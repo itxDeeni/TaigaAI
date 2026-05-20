@@ -80,13 +80,13 @@ def main():
     
     # Select model mapping
     if args.thinker:
-        model = models.get("thinker", "llama3.2:3b")
+        model = models.get("thinker", "llama3.2")
         mode_name = "Thinker Mode"
     elif args.sec:
-        model = models.get("security", "llama3.2:3b")
+        model = models.get("security", "llama3.2")
         mode_name = "Security Mode"
     else:
-        model = models.get("coder", "qwen2.5-coder:3b")
+        model = models.get("coder", "qwen2.5-coder")
         mode_name = "Coder Mode"
         
     # 3. Context Normalization Layer

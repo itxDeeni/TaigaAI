@@ -34,7 +34,7 @@ def main():
     config = load_config()
     models = config.get("models", {})
     ollama_url = config.get("ollama_url", "http://localhost:11434")
-    model = models.get("security", "llama3.2:3b")
+    model = models.get("security", "llama3.2")
 
     # 4. Normalize contexts
     builder = ContextBuilder()

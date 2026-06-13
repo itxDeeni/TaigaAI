@@ -245,5 +245,60 @@ class TestTaigaManageConsole(unittest.TestCase):
             exec(code, global_dict)
 
 
+class TestRedactionModule(unittest.TestCase):
+    def test_redact_aws_access_key(self):
+        from core.redaction import redact_text
+        text = "My key is AKIAIOSFODNN7EXAMPLE"
+        result = redact_text(text)
+        self.assertNotIn("AKIAIOSFODNN7EXAMPLE", result)
+        self.assertIn("[REDACTED_", result)
+
+    def test_redact_github_token(self):
+        from core.redaction import redact_text
+        text = "token=ghp_abcdefghijklmnopqrstuvwxyz1234567890"
+        result = redact_text(text)
+        self.assertNotIn("ghp_abcdefghijklmnopqrstuvwxyz1234567890", result)
+        self.assertIn("[REDACTED_", result)
+
+    def test_redact_length_preserved(self):
+        from core.redaction import redact_text, redact_text_verbose
+        original_key = "AKIAIOSFODNN7EXAMPLE"
+        text = f"key={original_key}"
+        result, details = redact_text_verbose(text)
+        # Extract the mask
+        for name, found in details:
+            mask_start = result.find("[REDACTED_")
+            mask_end = result.find("]", mask_start) + 1
+            mask = result[mask_start:mask_end]
+            self.assertEqual(len(mask), len(found),
+                f"Mask length {len(mask)} != original length {len(found)}: mask='{mask}', original='{found}'")
+
+    def test_redact_multiple_in_one_line(self):
+        from core.redaction import redact_text
+        text = "AWS: AKIAIOSFODNN7EXAMPLE, GitHub: ghp_abcdefghijklmnopqrstuvwxyz1234567890"
+        result = redact_text(text)
+        self.assertNotIn("AKIAIOSFODNN7EXAMPLE", result)
+        self.assertNotIn("ghp_abcdefghijklmnopqrstuvwxyz1234567890", result)
+        self.assertEqual(result.count("[REDACTED_"), 2)
+
+    def test_redact_no_false_positive_normal_code(self):
+        from core.redaction import redact_text
+        normal = """
+def hello():
+    print("hello world")
+    x = 42
+    return x
+"""
+        result = redact_text(normal)
+        self.assertEqual(result, normal)
+
+    def test_redact_jwt(self):
+        from core.redaction import redact_text
+        jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpA"
+        result = redact_text(jwt)
+        self.assertNotIn("eyJhbGciOiJIUzI1NiJ9", result)
+        self.assertIn("[REDACTED_", result)
+
+
 if __name__ == "__main__":
     unittest.main()

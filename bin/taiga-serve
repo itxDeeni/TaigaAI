@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+import sys
+import argparse
+from pathlib import Path
+
+PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from core.proxy_server import run_server
+
+def main():
+    parser = argparse.ArgumentParser(description="TaigaAI OpenAI-compatible proxy server")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Bind address")
+    parser.add_argument("--port", type=int, default=11435, help="Bind port")
+
+    args = parser.parse_args()
+    run_server(host=args.host, port=args.port)
+
+if __name__ == "__main__":
+    main()

@@ -12,6 +12,7 @@ if PROJECT_ROOT not in sys.path:
 
 from core.cache import LocalAICache
 from core.output_validator import OutputValidator
+from core.redaction import redact_text
 
 # Premium Terminal Colors
 COLOR_RESET = "\033[0m"
@@ -42,7 +43,12 @@ class OllamaClient:
         Main query router with integrated Caching, Fallback chains, and Output validation.
         """
         timeout = timeout or self.default_timeout
-        
+
+        # 0. Phase 0.1: Secret redaction at pipeline entry (before cache, before Ollama)
+        prompt = redact_text(prompt)
+        if system_prompt:
+            system_prompt = redact_text(system_prompt)
+
         # 1. Cache lookup for instant repeat execution
         cached_response = self.cache.get(model, f"{system_prompt or ''}\n{prompt}")
         if cached_response:

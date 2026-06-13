@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+import os
+import sys
+import argparse
+from pathlib import Path
+
+PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+from core.chat import ChatEngine
+
+COLOR_RESET = "\033[0m"
+COLOR_RED = "\033[38;5;196m"
+COLOR_BOLD = "\033[1m"
+
+def print_err(text):
+    print(f"{COLOR_RED}{COLOR_BOLD}taiga-chat: {text}{COLOR_RESET}", file=sys.stderr)
+
+def main():
+    parser = argparse.ArgumentParser(description="TaigaAI interactive chat REPL")
+    parser.add_argument("--model", type=str, default=None, help="Model to use")
+    parser.add_argument("--system", type=str, default=None, help="System prompt")
+    parser.add_argument("--session", type=str, default=None, help="Session name")
+    parser.add_argument("--load", type=str, default=None, help="Session ID to load")
+
+    args = parser.parse_args()
+
+    engine = ChatEngine(
+        model=args.model,
+        system_prompt=args.system,
+        session_name=args.session,
+    )
+
+    if args.load:
+        if not engine._load_session(args.load):
+            print_err(f"Session '{args.load}' not found")
+            sys.exit(1)
+        print(f"\033[38;5;82mLoaded session '{engine.session_name}' ({len(engine.messages)} turns).\033[0m")
+
+    engine.run()
+
+if __name__ == "__main__":
+    main()

@@ -63,13 +63,30 @@ def run_health_diagnostics():
     else:
         print(f"  Status: {COLOR_RED}Offline (Server not responding at {ollama_url}){COLOR_RESET}")
 
-    # 4. Prompt Cache Stats
-    # Try finding the database location
+    # 4. New Tools Status
+    print(f"\n{COLOR_BOLD}TaigaAI Tools:{COLOR_RESET}")
+    tools_info = [
+        ("taiga",        "Core AI router"),
+        ("taiga-chat",   "Interactive chat REPL"),
+        ("taiga-serve",  "OpenAI-compatible proxy server"),
+        ("taiga-git",    "Git commit & PR assistant"),
+        ("taiga-review", "Code review tool"),
+        ("taiga-sec",    "Security audit tool"),
+        ("taiga-manage", "Management console"),
+    ]
+    for cmd, desc in tools_info:
+        bin_path = Path(__file__).resolve().parent / cmd
+        if bin_path.exists() and os.access(bin_path, os.X_OK):
+            print(f"  {COLOR_GREEN}✔{COLOR_RESET} {cmd:{20}} {desc}")
+        else:
+            print(f"  {COLOR_RED}✘{COLOR_RESET} {cmd:{20}} {desc}")
+
+    # 5. Prompt Cache Stats
     db_name = "taiga_cache.db"
     db_path = Path("~/.config/taiga-ai").expanduser() / db_name
     if not db_path.exists():
-        db_path = Path(__file__).resolve().parent.parent / db_name
-        
+        db_path = Path(__file__).resolve().parent.parent / ".cache" / db_name
+
     print(f"\n{COLOR_BOLD}SQLite Query Cache Database:{COLOR_RESET} {db_path}")
     if db_path.exists():
         print(f"  Status: {COLOR_GREEN}Active{COLOR_RESET}")
@@ -83,7 +100,7 @@ def run_health_diagnostics():
             print(f"  {COLOR_RED}Could not read query cache database: {e}{COLOR_RESET}")
     else:
         print(f"  Status: {COLOR_GRAY}Uninitialized (Cache is created during first AI query){COLOR_RESET}")
-    
+
     input(f"\n{COLOR_GRAY}Press Enter to return to main menu...{COLOR_RESET}")
 
 def view_documentation():
@@ -136,7 +153,7 @@ def perform_uninstallation():
     print("\nStarting uninstallation process...")
     local_bin_dir = Path("~/.local/bin").expanduser()
     
-    commands = ["taiga", "taiga-git", "taiga-review", "taiga-sec", "taiga-manage"]
+    commands = ["taiga", "taiga-chat", "taiga-serve", "taiga-git", "taiga-review", "taiga-sec", "taiga-manage"]
     removed_count = 0
     
     # 1. Clean Linux/macOS symlinks
@@ -161,6 +178,15 @@ def main():
         os.system("clear" if os.name != "nt" else "cls")
         print_banner("TAIGAAI MANAGEMENT CONSOLE")
         
+        print(f"{COLOR_BOLD}━━━ Available Tools ━━━{COLOR_RESET}")
+        print("  taiga          Core AI router (coder/thinker/sec)")
+        print("  taiga-chat     Interactive chat REPL with session persistence")
+        print("  taiga-serve    OpenAI-compatible proxy on :11435")
+        print("  taiga-git      Git commit & PR assistant")
+        print("  taiga-review   Structured code review tool")
+        print("  taiga-sec      Security audit tool")
+        print(f"{COLOR_BOLD}━━━━━━━━━━━━━━━━━━━━━{COLOR_RESET}")
+        print()
         print("1) Run Setup & Diagnostics Wizard (Update Mappings)")
         print("2) System Health Diagnostics (Audit connections & Cache)")
         print("3) Display Core Documentation (README & Security Policies)")

@@ -2,7 +2,7 @@
 
 Welcome to the **TaigaAI Workstation Engine**. TaigaAI is a zero-autonomy, read-only developer copilot designed to work natively with your local Ollama models on **Linux, macOS, and Windows**.
 
-By prioritizing native Python execution, **canonical path sandboxing**, and strict structured prompt contracts, the system guarantees high-value coding assistance, git workflows, and security auditing without exposing your filesystem or shell.
+By prioritizing native Python execution, **canonical path sandboxing**, **secret redaction**, and strict structured prompt contracts, the system guarantees high-value coding assistance, interactive chat, git workflows, and security auditing without exposing your filesystem or shell.
 
 ---
 
@@ -14,7 +14,7 @@ By prioritizing native Python execution, **canonical path sandboxing**, and stri
    ```bash
    ./install.sh
    ```
-   *This automatically registers safe, dynamic symbolic links inside `~/.local/bin/` so the tools are accessible globally in your shell.*
+   *This automatically registers safe, dynamic symbolic links inside `~/.local/bin/` so all tools are accessible globally in your shell.*
 
 ### 🔌 Windows Setup
 1. Clone the repository to your chosen directory.
@@ -23,7 +23,7 @@ By prioritizing native Python execution, **canonical path sandboxing**, and stri
    Set-ExecutionPolicy Bypass -Scope Process
    .\install.ps1
    ```
-   *This self-diagnoses Windows Python & Git pathways and permanently adds the workstation's batch wrappers directly to your User Environment Path so you can type `taiga`, `taiga-git`, `taiga-review`, and `taiga-sec` inside any PowerShell or Command Prompt terminal instantly.*
+   *This self-diagnoses Windows Python & Git pathways and permanently adds the workstation's batch wrappers directly to your User Environment Path so you can type any `taiga-*` command inside any PowerShell or Command Prompt terminal instantly.*
 
 ---
 
@@ -32,12 +32,13 @@ By prioritizing native Python execution, **canonical path sandboxing**, and stri
 1. **Canonical Path Resolution**: Every input file argument is verified using Python's `Path(file_path).resolve()`. This resolves symlinks, relative traversal operators (`../../`), and double-dots to their target absolute directories.
 2. **Directory Whitelist**: Files can only be read if their resolved path lies inside the configured whitelist (e.g. `~/Documents/Code`, `~/projects`, `~/dev`). Supports `~` home directory shortcuts for absolute portability across different user accounts.
 3. **Memory DoS Boundaries**: Imposes an explicit **5MB size threshold** on all read operations, preventing memory exhaustion attacks from massive log files or data dumps.
-4. **Prompt Injection Escaping**: Escapes nested standard XML container tags and CDATA closures within ingested code, git diffs, and piped inputs to block prompt injection or prompt layout escaping.
-5. **Auto-Eviction Query Cache**: SQLite cache is dynamically capped to the **200 most recent queries** via transaction `rowid` ordering, ensuring the local cache database never consumes excessive disk space.
-6. **Interactive Model Puller**: Intercepts Ollama 404 model-not-found errors and offers interactive, stream-download progress bars directly in the terminal, completely avoiding silent network queries or headless downloads.
-7. **Dynamic Config Discovery**: Looks for configuration defaults in local workspaces, standard Linux/macOS paths (`~/.config/taiga-ai/config.json`), or Windows APPDATA, keeping settings intact across workspace moves.
-8. **Command Execution Isolation**: AI outputs are strictly treated as text. There is zero `eval` or automated command execution. Suggested shell commands must be inspected and executed manually by you.
-9. **No Auto-Commit Policy**: The Git assistant analyzes changes and generates commit messages, but never commits or pushes to remote repositories automatically.
+4. **Secret & Credential Redaction**: 19 regex-based patterns (AWS keys, GitHub tokens, JWT, PEM keys, database URLs, etc.) are detected and **length-preserving masked** at pipeline entry — before cache, before Ollama — so credentials never leak into system logs or SQLite. Masks preserve original string length to avoid breaking AST offsets.
+5. **Prompt Injection Escaping**: Escapes nested standard XML container tags and CDATA closures within ingested code, git diffs, and piped inputs to block prompt injection or prompt layout escaping.
+6. **Auto-Eviction Query Cache**: SQLite cache is dynamically capped to the **200 most recent queries** via transaction `rowid` ordering, ensuring the local cache database never consumes excessive disk space.
+7. **Interactive Model Puller**: Intercepts Ollama 404 model-not-found errors and offers interactive, stream-download progress bars directly in the terminal, completely avoiding silent network queries or headless downloads.
+8. **Dynamic Config Discovery**: Looks for configuration defaults in local workspaces, standard Linux/macOS paths (`~/.config/taiga-ai/config.json`), or Windows APPDATA, keeping settings intact across workspace moves.
+9. **Command Execution Isolation**: AI outputs are strictly treated as text. There is zero `eval` or automated command execution. Suggested shell commands must be inspected and executed manually by you.
+10. **No Auto-Commit Policy**: The Git assistant analyzes changes and generates commit messages, but never commits or pushes to remote repositories automatically.
 
 *For an extensive architecture map, security posture analysis, and details on active security controls, check out the dedicated [SECURITY.md](SECURITY.md) policy guide.*
 
@@ -136,6 +137,85 @@ Remediation: <Specific secure design advice and fix implementation description>
 
 ---
 
+### 5. Interactive Chat REPL (`taiga-chat`)
+
+Multi-turn chat session with persistence, history, and project-aware context.
+
+```bash
+# Launch interactive chat
+taiga-chat
+
+# Load a specific model
+taiga-chat --model qwen3.5:9b
+
+# Resume a saved session
+taiga-chat --load <session_id>
+```
+
+**Session commands within the REPL:**
+| Command | Description |
+|---------|-------------|
+| `/exit`, `/quit` | Save session and exit |
+| `/clear` | Clear current conversation |
+| `/save [name]` | Save session to SQLite |
+| `/load [id]` | List or load a session |
+| `/sessions` | List all saved sessions |
+| `/delete [id]` | Delete a session |
+| `/model [name]` | Show or switch model |
+| `/help` | Show all commands |
+
+*Multi-line input via `Alt+Enter`. Arrow keys for history search.*
+
+---
+
+### 6. OpenAI-Compatible Proxy Server (`taiga-serve`)
+
+Exposes TaigaAI as a secure OpenAI API proxy at `http://localhost:11435`, enforcing secret redaction and security policies on every request before forwarding to Ollama.
+
+```bash
+# Start the proxy server
+taiga-serve
+
+# Custom bind
+taiga-serve --host 127.0.0.1 --port 11435
+```
+
+**Use with any OpenAI-compatible client** (Continue.dev, Aider, Cursor, Cline):
+
+```json
+{
+  "models": [{
+    "title": "Taiga Secure Qwen",
+    "provider": "openai",
+    "model": "qwen3.5:9b",
+    "apiBase": "http://localhost:11435/v1"
+  }]
+}
+```
+
+**Supported endpoints:**
+- `POST /v1/chat/completions` — streaming (SSE) and non-streaming
+- `GET /v1/models` — list available local models
+
+---
+
+### 7. Project-Level Configuration
+
+Per-project overrides live in `.taiga/config.json` at project root:
+
+```json
+{
+  "model": "qwen3.5:9b",
+  "system_prompt": "You are a project-specific assistant..."
+}
+```
+
+Additional project files:
+- **`.taigaignore`** — glob patterns excluded from context (`node_modules/`, `*.pyc`)
+- **`.taigacontext`** — explicit files always included in context
+
+---
+
 ## ⚡ Local Cache & Modeling Performance
 
 The engine includes **Local Query Caching** (backed by SQLite). 
@@ -185,38 +265,35 @@ Example configuration output:
 
 ## 🎨 VS Code Integration (Fully Local Autocomplete)
 
-You can completely replace GitHub Copilot or tab-completion with local models running on your Ollama server.
+You can completely replace GitHub Copilot or tab-completion with local models running through the TaigaAI secure proxy.
 
-### Option A: Continue.dev Extension (Recommended)
+### Via TaigaAI Proxy (Recommended — Enforces Security Policies)
+
+Run the proxy in the background, then point any OpenAI-compatible extension at it:
+
+```bash
+taiga-serve &
+```
+
+Configure your editor to use `http://localhost:11435/v1` as the API base.
+
+### Option A: Continue.dev Extension
 `Continue` is a premier open-source AI assistant plugin for VS Code.
 
 1. Install the **Continue** extension from the VS Code Marketplace.
 2. Open `~/.continue/config.json` (or press `Ctrl+Shift+P` -> "Continue: Open config.json").
-3. Replace the `models` and `tabAutocompleteModel` sections to target your local Ollama models:
+3. Use the TaigaAI proxy endpoint to enforce security policies:
 
 ```json
 {
   "models": [
     {
-      "title": "Qwen 2.5 Coder",
-      "provider": "ollama",
-      "model": "qwen2.5-coder"
-    },
-    {
-      "title": "Llama 3.2",
-      "provider": "ollama",
-      "model": "llama3.2"
+      "title": "Taiga Secure",
+      "provider": "openai",
+      "model": "qwen3.5:9b",
+      "apiBase": "http://localhost:11435/v1"
     }
-  ],
-  "tabAutocompleteModel": {
-    "title": "Qwen 2.5 Coder",
-    "provider": "ollama",
-    "model": "qwen2.5-coder"
-  },
-  "tabAutocompleteOptions": {
-    "useCopyBuffer": true,
-    "maxPromptTokens": 1024
-  }
+  ]
 }
 ```
 
@@ -224,7 +301,7 @@ You can completely replace GitHub Copilot or tab-completion with local models ru
 If you only want fast, single-line inline code completions:
 1. Install **Llama Coder** from the VS Code Extensions tab.
 2. Open VS Code Settings (`Ctrl+,`) and configure:
-   - `Llama Coder: Model` ➔ `qwen2.5-coder`
+   - `Llama Coder: Model` ➔ `qwen3.5:9b`
    - `Llama Coder: Endpoint` ➔ `http://localhost:11434`
 
 ---
@@ -234,10 +311,11 @@ If you only want fast, single-line inline code completions:
 To ensure that your installation is fully functional and that all sandboxing rules are actively running on your workstation, we provide both a programmatic unit test suite and a manual verification checklist.
 
 ### 1. Running the Automated Test Suite
-From the root of the repository, run the comprehensive, mock-isolated unit test suite to assert the correctness of path resolution, size limits, caching, regex validation, and XML escaping:
+From the root of the repository, run the comprehensive, mock-isolated unit test suite to assert the correctness of path resolution, size limits, caching, regex validation, XML escaping, and secret redaction:
 ```bash
 python3 tests/test_engine.py
 ```
+*21 tests covering 7 modules.*
 
 ### 2. Manual Verification Checklist
 * **Symlink Resolution**: Run `which taiga` to confirm that the shell correctly locates the symlink at `~/.local/bin/taiga`.
@@ -249,3 +327,17 @@ python3 tests/test_engine.py
 ## 🔒 Security Audit & Policy
 
 For in-depth documentation covering architecture, threat vector assessment, and active security controls, refer to the [SECURITY.md](SECURITY.md) policy guide.
+
+---
+
+## 🗺️ Roadmap
+
+See [IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md) for the full engineering roadmap covering:
+
+- **Phase 0:** WAL mode, secret redaction, hybrid context truncation ✓
+- **Phase 1:** Chat REPL, proxy server, project-level config ✓
+- **Phase 2:** MCP client/server, editor integrations
+- **Phase 3:** Project maps, multi-model routing, optional RAG
+- **Phase 4:** Git deepening, prompt templates
+- **Phase 5:** Observability dashboard, cache analytics
+- **Phase 6:** Multi-user support, namespace sandboxing

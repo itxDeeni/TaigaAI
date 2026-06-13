@@ -1,5 +1,7 @@
 # TaigaAI Workstation Engine
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+
 Welcome to the **TaigaAI Workstation Engine**. TaigaAI is a zero-autonomy, read-only developer copilot designed to work natively with your local Ollama models on **Linux, macOS, and Windows**.
 
 By prioritizing native Python execution, **canonical path sandboxing**, **secret redaction**, and strict structured prompt contracts, the system guarantees high-value coding assistance, interactive chat, git workflows, and security auditing without exposing your filesystem or shell.
